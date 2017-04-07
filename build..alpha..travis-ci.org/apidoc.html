@@ -61,12 +61,198 @@
 
     <li class="apidocModuleLi"><a href="#apidoc.module.gulp-tslint">module gulp-tslint</a><ol>
 
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.gulp-tslint.default">
+            function <span class="apidocSignatureSpan">gulp-tslint.</span>default
+            <span class="apidocSignatureSpan">(pluginOptions)</span>
+            </a>
+
+        </li>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.gulp-tslint.report">
+            function <span class="apidocSignatureSpan">gulp-tslint.</span>report
+            <span class="apidocSignatureSpan">(options)</span>
+            </a>
+
+        </li>
+
     </ol></li>
 
 </ol></div>
 
 <div class="apidocSectionDiv">
 <h1><a href="#apidoc.module.gulp-tslint" id="apidoc.module.gulp-tslint">module gulp-tslint</a></h1>
+
+
+    <h2>
+        <a href="#apidoc.element.gulp-tslint.default" id="apidoc.element.gulp-tslint.default">
+        function <span class="apidocSignatureSpan">gulp-tslint.</span>default
+        <span class="apidocSignatureSpan">(pluginOptions)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">default = function (pluginOptions) {
+    var loader;
+    var tslint;
+    // If user options are undefined, set an empty options object
+    if (!pluginOptions) {
+        pluginOptions = {};
+    }
+    return map(function (file, cb) {
+        // Skip
+        if (file.isNull()) {
+            return cb(null, file);
+        }
+        // Stream is not supported
+        if (file.isStream()) {
+            return cb(new PluginError(&#x22;gulp-tslint&#x22;, &#x22;Streaming not supported&#x22;));
+        }
+        // TSLint default options
+        var options = {
+            fix: pluginOptions.fix || false,
+            formatter: pluginOptions.formatter || &#x22;prose&#x22;,
+            formattersDirectory: pluginOptions.formattersDirectory || null,
+            rulesDirectory: pluginOptions.rulesDirectory || null
+        };
+        var linter = getTslint(pluginOptions);
+        if (pluginOptions.configuration === null ||
+            pluginOptions.configuration === undefined ||
+            isString(pluginOptions.configuration)) {
+            // configuration can be a file path or null, if it&#x27;s unknown
+            pluginOptions.configuration = linter.Configuration.findConfiguration(pluginOptions.configuration || null, file.path).
+results;
+        }
+        tslint = new linter.Linter(options, pluginOptions.program);
+        tslint.lint(file.path, file.contents.toString(&#x22;utf8&#x22;), pluginOptions.configuration);
+        file.tslint = tslint.getResult();
+        // Pass file
+        cb(null, file);
+    });
+}</pre></li>
+    <li>example usage<pre class="apidocCodePre">n/a</pre></li>
+    </ul>
+
+
+
+    <h2>
+        <a href="#apidoc.element.gulp-tslint.report" id="apidoc.element.gulp-tslint.report">
+        function <span class="apidocSignatureSpan">gulp-tslint.</span>report
+        <span class="apidocSignatureSpan">(options)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">report = function (options) {
+    // Notify the user that the old interface is used, this can be removed at some point
+    if (isString(options)) {
+        throw new Error(&#x22;Deprecated interface used! See 6.0.0 changelog &#x22; +
+            &#x22;https://github.com/panuhorsmalahti/gulp-tslint/blob/master/CHANGELOG.md&#x22;);
+    }
+    // Default options
+    if (!options) {
+        options = {};
+    }
+    if (options.emitError === undefined) {
+        options.emitError = true;
+    }
+    if (options.reportLimit === undefined) {
+        // 0 or less is unlimited
+        options.reportLimit = 0;
+    }
+    if (options.summarizeFailureOutput === undefined) {
+        options.summarizeFailureOutput = false;
+    }
+    // Collect all files with errors
+    var errorFiles = [];
+    // Collect all failures
+    var allFailures = [];
+    // Track how many errors have been reported
+    var totalReported = 0;
+    // Log formatted output for each file individually
+    var reportFailures = function (file) {
+        if (file.tslint) {
+            var failureCount = file.tslint.failureCount;
+            if (failureCount &#x3e; 0) {
+                errorFiles.push(file);
+                Array.prototype.push.apply(allFailures, file.tslint.failures);
+                if (options.reportLimit &#x3c;= 0 || (options.reportLimit &#x26;&#x26; options.reportLimit &#x3e; totalReported)) {
+                    if (file.tslint.output !== undefined) {
+                        console.log(file.tslint.output);
+                    }
+                    totalReported += failureCount;
+                    if (options.reportLimit &#x3e; 0 &#x26;&#x26;
+                        options.reportLimit &#x3c;= totalReported) {
+                        log(&#x22;More than &#x22; + options.reportLimit
+                            + &#x22; failures reported. Turning off reporter.&#x22;);
+                    }
+                }
+            }
+        }
+        // Pass file
+        this.emit(&#x22;data&#x22;, file);
+    };
+    /**
+     * After reporting on all files, throw the error.
+     */
+    var throwErrors = function () {
+        // Throw error
+        if (options &#x26;&#x26; errorFiles.length &#x3e; 0) {
+            var failuresToOutput = allFailures;
+            var ignoreFailureCount = 0;
+            // If error count is limited, calculate number of errors not shown and slice reportLimit
+            // number of errors to be included in the error.
+            if (options.reportLimit &#x3e; 0) {
+                ignoreFailureCount = allFailures.length - options.reportLimit;
+                failuresToOutput = allFailures.slice(0, options.reportLimit);
+            }
+            // Always use the proseErrorFormat for the error.
+            var failureOutput = failuresToOutput.map(function (failure) {
+                return proseErrorFormat(failure);
+            }).join(&#x22;, &#x22;);
+            var errorOutput = &#x22;Failed to lint: &#x22;;
+            if (options.summarizeFailureOutput) {
+                errorOutput += failuresToOutput.length + &#x22; errors.&#x22;;
+            }
+            else {
+                errorOutput += failureOutput + &#x22;.&#x22;;
+            }
+            if (ignoreFailureCount &#x3e; 0) {
+                errorOutput += &#x22; (&#x22; + ignoreFailureCount
+                    + &#x22; other errors not shown.)&#x22;;
+            }
+            if (options.emitError === true) {
+                return this.emit(&#x22;error&#x22;, new PluginError(&#x22;gulp-tslint&#x22;, errorOutput));
+            }
+            else if (options.summarizeFailureOutput) {
+                log(errorOutput);
+            }
+        }
+        // Notify through that we&#x27;re done
+        this.emit(&#x22;end&#x22;);
+    };
+    return through(reportFailures, throwErrors);
+}</pre></li>
+    <li>example usage<pre class="apidocCodePre">...
+var tslint = require(&#x22;gulp-tslint&#x22;);
+
+gulp.task(&#x22;tslint&#x22;, () =&#x3e;
+    gulp.src(&#x22;source.ts&#x22;)
+        .pipe(tslint({
+            formatter: &#x22;verbose&#x22;
+        }))
+        .pipe(tslint.<span class="apidocCodeKeywordSpan">report</span>())
+);
+```
+
+Types should work automatically.
+
+**tslint.json** is attempted to be read from near the input file.
+It **must be available** or supplied directly through the options.
+...</pre></li>
+    </ul>
+
 
 </div>
 
